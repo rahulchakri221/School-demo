@@ -1,528 +1,93 @@
-# Instructions for AI agents using `@higgsfield/fnf-react`
+# Scroll-scrub website
 
-Canonical AI guide for React apps that consume `@higgsfield/fnf-react`.
-This package is the React integration layer over `@higgsfield/fnf`: TanStack
-Query options for pull-shaped reads, external-store controllers for push-shaped
-lifecycles (submit runs, uploads), stable SDK clients from one provider, and no
-UI/product policy. All generation cache writes go through one door so job,
-job-set, and feed entries stay consistent and terminal statuses never regress.
+A **`type: "website"`** template — a standalone brand, NOT a Higgsfield app.
+The visitor's scroll plays a generated film while semantic chapters read over
+it. The scrub engine is already built; your job is the film, the scenes, and
+the brand.
 
-For model contracts, routes, settings, media validation, profile types, errors,
-credits, and adapter behavior, read `../../fnf/ai/AGENTS.md` first. This guide
-only explains the React integration layer. For generated UI, pair this package
-with `@higgsfield/quanta` and read `../../quanta/ai/AGENTS.md`; `fnf-react`
-does not provide components, styles, layout rules, or product copy.
+The authoritative workflow is the `website-builder-flow` skill
+(`references/scroll-scrub.md`). This file is the in-repo contract.
 
-## TL;DR rules
+## The engine is done — do not rewrite it
 
-1. **Use both providers.** Host apps provide TanStack's `QueryClientProvider`;
-   this package provides `FnfProvider`.
-2. **Create SDK clients through `FnfProvider` in React code.** Use
-   `createFnfReactClients()` only for tests or advanced non-provider hosts.
-3. **Keep adapter, jobs, uploader, resolver, and observability references
-   stable.** Controllers are stateful and bind to the first client/options they
-   receive.
-4. **Always use `scopeKey` for user/workspace caches.** Recommended shape:
-   `${userId}:${workspaceId}`. Pass `{ scopeKey }` to query helpers and cache
-   door helpers.
-5. **Use query-option factories.** Use `generationQueryOptions`,
-   `jobSetQueryOptions`, `jobsFeedQueryOptions`, character/reference/profile
-   query options, and `costQueryOptions`. Never inline TanStack query-key
-   arrays.
-6. **Use the cache door for generation writes.** `applyGenerations`,
-   `prependGenerations`, and `removeGenerationQueries` are the only supported
-   generation cache mutation helpers.
-7. **Resume live feed items.** Call `useLiveFeedGenerations` with the flattened
-   feed so queued/in-progress jobs restored after a refresh keep polling.
-8. **Use controllers for push lifecycles.** `useGenerationRun` handles submit
-   to terminal state. `useAttachments` handles file upload and submit-ready
-   refs.
-9. **Errors are state, not UI policy.** `run.start()` does not reject; read
-   `run.error`, `run.failed`, and generation statuses. This package does not
-   show toasts, redirect, gate plans, or write product copy.
-10. **Workspace switching is only SDK/backend context.** Host apps still update
-   Clerk/session metadata, adapter header state, routing, and copy.
-11. **Observability is safe metadata-only.** Never emit prompts, raw params,
-   headers, tokens, URLs, filenames, emails, workspace names, or file bytes.
-12. **Use Quanta for the actual interface.** Build forms, feeds, profile panels,
-    drawers, command palettes, toasts, and status surfaces with Quanta
-    components in host apps; keep this package headless.
+`src/components/scroll-scrub/scroll-scrub.tsx` + `.css` ship the full runtime:
+Blob-backed seeking, seek coalescing, lazy nearby-segment loading, desktop and
+mobile sources, exact-frame posters held until a real painted frame, iOS
+gesture priming, `prefers-reduced-motion`, reverse scroll, and complete
+teardown (aborts, listeners, RAF, revoked Blob URLs).
 
-## Provider setup
+Do NOT rebuild the controller, drive per-frame values through React state, or
+attach a second scroll timeline to the same video elements. Adapt composition
+and scene data instead. The engine intentionally ships **no** header, no shared
+button system, no scroll hint, and no per-scene eyebrow — compose the site's
+own nav and bespoke CTAs around it.
 
-```tsx
-import { createFnfWebAdapter } from '@higgsfield/fnf-adapters'
-import { seedance2_0 } from '@higgsfield/fnf/jobs'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useMemo } from 'react'
-import {
-  FnfProvider,
-  useFnf,
-  useFnfCharacterClient,
-  useFnfJobClient,
-  useFnfJobs,
-  useFnfLlmClient,
-  useFnfMediaClient,
-  useFnfObservability,
-  useFnfProfileClient,
-  useFnfReferenceClient,
-  useFnfScopeKey,
-} from '@higgsfield/fnf-react'
+## What you fill in
 
-const queryClient = new QueryClient()
+| File | What you do |
+|---|---|
+| `src/scroll-scrub-scenes.ts` | Brand tokens + the scene array. Every `<...>` placeholder gets real copy. |
+| `src/routes/index.tsx` | Compose the page: nav, chapters, CTAs, and the content sections after the journey. |
+| `public/assets/world/` | The encoded clips and their exact-frame posters. |
+| `src/styles.css` | The site's own token layer from the design brief. |
+| `src/app-meta.json` | `og_title`, `og_description`, `favicon_url`, `og_image_url`, `marketplace_cover_url`. |
 
-function Root() {
-  const adapter = useMemo(
-    () => createFnfWebAdapter({
-      baseUrl,
-      getToken,
-      workspaceId: activeWorkspaceId,
-    }),
-    [activeWorkspaceId, baseUrl, getToken],
-  )
-  const scopeKey = `${userId}:${activeWorkspaceId}`
+## Hard rules
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <FnfProvider
-        adapter={adapter}
-        jobs={[seedance2_0]}
-        scopeKey={scopeKey}
-        observability={observability}
-      >
-        <App />
-      </FnfProvider>
-    </QueryClientProvider>
-  )
-}
+- **This is a website, not an app.** Never import `@higgsfield/quanta/*`, never
+  use q-prefixed tokens, never add "Sign in with Higgsfield", the fnf SDK, or
+  any runtime generation. No "Powered by Higgsfield" anywhere in page content.
+  The user's brand is the only brand on the page.
+- **Every `poster` is the exact first frame of the clip beside it.** Never a
+  design board, never an imagined destination still, never the next scene's
+  image. Generate posters from the ENCODED clip, after encoding.
+- **Provide `mobilePoster` whenever `mobileClip` is set.**
+- **Keep `scrollScrubScenes` a module constant.** Changing its identity on
+  every render rebuilds the controller.
+- **CSP:** the controller assigns Blob URLs to `<video src>`, so `media-src`
+  must include `blob:` and clip fetches stay same-origin (`connect-src 'self'`).
+- **Byte budget:** start at ≤32 MiB for all desktop clips and ≤16 MiB for all
+  mobile clips. Visited clips are retained for smooth reverse scroll, so
+  oversized clips cost memory as well as transfer.
+- **SSR safety:** no browser global at module top level or during render. A
+  top-level `window` reference crashes SSR.
+- **No placeholders may ship.** Every `<...>` token is replaced before deploy.
 
-function App() {
-  const fnf = useFnf()
-  const characters = useFnfCharacterClient()
-  const jobs = useFnfJobClient()
-  const media = useFnfMediaClient()
-  const profile = useFnfProfileClient()
-  const references = useFnfReferenceClient()
-  const registry = useFnfJobs()
-  const scopeKey = useFnfScopeKey()
-  const observability = useFnfObservability()
+## Vendored packages and legacy scaffold files
 
-  void fnf
-  void characters
-  void jobs
-  void media
-  void profile
-  void references
-  void registry
-  void scopeKey
-  void observability
-}
+`app/packages/` holds managed snapshots vendored from the Higgsfield web app
+(`@higgsfield/fnf`, `fnf-react`, `quanta`, `app-landing`). Websites never use
+them, but do NOT edit or delete them, and leave the Quanta Tailwind entry wired
+in `src/styles.css` — the build depends on it.
+
+**This template is a byte-for-byte copy of the `custom` app scaffold**, plus the
+three scroll-scrub files and a `/` that renders the journey. Keeping it in
+lockstep with `custom` is deliberate: the platform's build, deploy and design
+inspector all assume that tree, and every past divergence has been a bug.
+
+So it also carries the whole Higgsfield **app** surface — `src/layouts/`, the
+`/app` route, `src/landing-content.ts`, the fnf/Quanta components (composer,
+generation-card, gallery, asset-library, user-generations), the shadcn kit, and
+demo assets under `public/presets/`. For a website these are inert raw material,
+NOT part of the product:
+
+- Do NOT wire them into the site, and do NOT import from `@higgsfield/quanta/*`
+  or the fnf SDK by way of them.
+- Delete NOTHING. Unused files simply stay unreferenced. Removing them is what
+  makes this template drift from `custom`.
+- The shadcn primitives in `@/components/ui` may be restyled to the design brief
+  as ordinary React components when genuinely useful.
+
+## Required completion checks
+
+```bash
+cd app
+bun run typecheck
+bun run build   # runs check:ui first, same as every app template
 ```
 
-`FnfProvider` accepts:
-
-- `adapter`: required jobs backend. The fnf-web adapter also satisfies media
-  and profile ports. UI hosts that submit generations must pass the adapter's
-  `confirm` option — see "Submission confirmation gate" in
-  `../../fnf/ai/AGENTS.md`.
-- `jobs`: required SDK model registry. Model/settings autocomplete flows from
-  this array.
-- `mediaAdapter`, `profileAdapter`: optional overrides when jobs/media/profile
-  use different ports.
-- `characterAdapter`, `referenceAdapter`: optional overrides for
-  custom-reference training and the user's Elements library.
-- `blobUploader`, `resolveJob`: optional media-client dependencies.
-- `llm`: optional browser-safe LLM chat backend. Read it with
-  `useFnfLlmClient()` — the hook throws if no `llm` was provided. Generated
-  apps keep the raw zero-token `createLlmClient` instance Worker-side on
-  `https://fnf.internal/llm`, discover current ids there with `listModels()`,
-  and proxy app-safe operations through authenticated server functions or
-  routes. Never pass the raw client or a hardcoded catalog to browser code (see
-  "LLM (chat completions)" in `../../fnf/ai/AGENTS.md`).
-- `scopeKey`: optional cache isolation key; use it for user/workspace apps.
-- `observability`: optional safe SDK observer config propagated into created
-  job, media, profile clients and React controllers.
-
-Use `createFnfReactClients(config)` for unit tests or non-provider hosts. Normal
-components should read clients from provider hooks.
-
-Important stability rule: do not create adapters or job arrays inline if that
-causes a new reference every render. Keep them at module scope, in state, or in
-memoized host infrastructure. Controllers intentionally bind to the first client
-they receive.
-
-## Browser/server boundary
-
-`fnf-react` can run in browser React, but auth policy belongs to the host.
-
-- Product apps may use a browser adapter only when the host intentionally
-  provides a safe user-scoped token source.
-- Generated app templates with server-only credentials should use browser
-  adapters that call app-local `/api/*` routes, not direct fnf backend routes.
-- Never expose dev user ids, bearer tokens, or privileged workspace headers to
-  arbitrary visitors.
-
-This package should not import environment variables or decide where secrets
-live.
-
-## Query options: pull side
-
-Always use the exported query-option factories. They are the public contract for
-polling, stale-time, key shapes, and scope behavior.
-
-```tsx
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import {
-  characterQueryOptions,
-  costQueryOptions,
-  flattenFeedPages,
-  generationQueryOptions,
-  jobSetQueryOptions,
-  jobsFeedQueryOptions,
-  profileSnapshotQueryOptions,
-  referenceQueryOptions,
-  referencesQueryOptions,
-  useLiveFeedGenerations,
-} from '@higgsfield/fnf-react'
-
-const scope = { scopeKey }
-
-const generation = useQuery(generationQueryOptions(jobClient, jobId, scope))
-const character = useQuery(characterQueryOptions(characterClient, characterId, scope))
-const element = useQuery(referenceQueryOptions(referenceClient, elementId, scope))
-const elements = useQuery(referencesQueryOptions(
-  referenceClient,
-  { category: 'character' },
-  scope,
-))
-const jobSet = useQuery(jobSetQueryOptions(jobClient, jobSetId, scope))
-
-const feed = useInfiniteQuery({
-  ...jobsFeedQueryOptions(jobClient, { type: 'video', size: 20 }, scope),
-  select: flattenFeedPages,
-})
-useLiveFeedGenerations(jobClient, feed.data ?? [], scope)
-
-const snapshot = useQuery(profileSnapshotQueryOptions(profileClient, scope))
-const cost = useQuery(costQueryOptions(jobClient, input, {
-  ...scope,
-  enabled: wirePreview.ok,
-}))
-```
-
-Defaults:
-
-- `generationQueryOptions` polls every `DEFAULT_POLL_INTERVAL_MS` while
-  non-terminal, in background, and stops once terminal.
-- `jobSetQueryOptions` polls one whole job set per tick and stops when every
-  member is terminal.
-- `jobsFeedQueryOptions` is door-driven with `staleTime: Infinity` by default.
-  Use `invalidateQueries` for hard refreshes or spread your own `staleTime` if
-  a host wants focus refetches.
-- `flattenFeedPages` converts paginated feed data into a deduplicated list.
-- `characterQueryOptions` polls character training until `completed` or
-  `failed`; `referenceQueryOptions` polls processing Elements, while
-  `referencesQueryOptions` lists the user's Elements library.
-
-## Query keys and scope
-
-Use `fnfKeys` factories only. Unscoped key shapes are backward-compatible public
-contracts:
-
-```ts
-fnfKeys.job('g1')              // ['fnf', 'job', 'g1']
-fnfKeys.jobSet('set1')         // ['fnf', 'job-set', 'set1']
-fnfKeys.jobs({ type: 'video' }) // ['fnf', 'jobs', { type: 'video' }]
-```
-
-Scoped variants are additive:
-
-```ts
-const scope = { scopeKey: `${userId}:${workspaceId}` }
-
-fnfKeys.job('g1', scope)
-fnfKeys.jobSet('set1', scope)
-fnfKeys.jobs({ type: 'video' }, scope)
-fnfKeys.cost(input, scope)
-fnfKeys.character('character1', scope)
-fnfKeys.reference('element1', scope)
-fnfKeys.references({ category: 'character' }, scope)
-fnfKeys.profileSnapshot(scope)
-fnfKeys.profileCredits({ ...scope, includeOnDemand: false })
-```
-
-Do not write `['fnf', ...]` arrays by hand in app code.
-
-After character training completes, invalidate the matching
-`fnfKeys.references(...)` query so the new Character Element appears. The
-Element id and `reference.characterId` are distinct; pass `characterId` to
-Soul generation as `settings.customReferenceId`.
-
-## Cache door rules
-
-Use these helpers for generation cache mutations:
-
-```tsx
-import {
-  applyGenerations,
-  prependGenerations,
-  removeGenerationQueries,
-} from '@higgsfield/fnf-react'
-
-applyGenerations(queryClient, liveGenerations, { scopeKey })
-prependGenerations(queryClient, { type: 'video', size: 20 }, submittedGenerations, { scopeKey })
-removeGenerationQueries(queryClient, { scopeKey })
-```
-
-Rules:
-
-- `applyGenerations` updates existing caches only. It folds fresh snapshots into
-  job, job-set, and feed entries that already contain those ids.
-- `prependGenerations` inserts fresh submit results into one explicit feed. The
-  host chooses which feeds should show optimistic new work.
-- `removeGenerationQueries` clears generation, job-set, feed, and cost caches
-  for a scope without clearing profile caches.
-- `foldGeneration` prevents stale non-terminal snapshots from reopening settled
-  generations and preserves object references when nothing changed.
-- Direct `queryClient.setQueryData(...)` for generation snapshots is an
-  anti-pattern outside tested package helpers.
-
-## Submit lifecycle controller
-
-Use `useGenerationRun` in components and `GenerationRun` directly in tests or
-framework adapters.
-
-```tsx
-import {
-  prependGenerations,
-  useGenerationRun,
-} from '@higgsfield/fnf-react'
-
-const run = useGenerationRun(jobClient, { scopeKey })
-
-async function submit(input: Parameters<typeof jobClient.submit>[0]) {
-  const generations = await run.start(input)
-  prependGenerations(queryClient, { type: 'video', size: 20 }, generations, { scopeKey })
-}
-```
-
-Lifecycle:
-
-- `idle -> submitting -> generating -> completed | failed | aborted`
-- `run.start(input)` resolves with settled generations and never rejects.
-- `run.error` holds submit/poll run-level errors.
-- `run.failed` and `run.warning` hold partial fan-out submit failures.
-- Each generation's own `status` remains the per-job verdict surface.
-- Starting a new run aborts the previous polling loop and late results are
-  dropped.
-- Unmounting the hook aborts polling. It does not cancel backend jobs; call the
-  SDK job client's `cancel(id)` for server-side cancellation.
-- Every controller commit folds `run.generations` through `applyGenerations`.
-  It does not decide which feed should show fresh submits; call
-  `prependGenerations` explicitly.
-
-The job client passed to `useGenerationRun` must ultimately reach a server-side
-SDK call. If a host wraps SDK calls in TanStack server functions or `/api/*`
-routes, submit and cost must be `POST`, not `GET`. A 405 / "Method Not Allowed"
-on generation is usually a route/function method mismatch below the React
-controller, an old `operation`-envelope WFP adapter snapshot, or a backend route
-contract mismatch. It is not a `useGenerationRun` state problem.
-
-Do not send raw browser files through React Query variables or server-function
-JSON inputs. For server-only fnf.internal hosts, upload files via multipart
-`FormData` to an app-local `POST /api/media/upload` route and store only the
-returned `MediaRef` in React state. `useGenerationRun` should receive
-prompt/settings/refs, never `File`, `Blob`, `ArrayBuffer`, base64, or byte
-arrays.
-
-`useGenerationRun` receives provider observability by default. Pass
-`observability` in hook options only when a specific run needs a different
-observer.
-
-## Attachments controller
-
-Use `useAttachments` for file inputs. It uploads immediately, keeps previews,
-and returns submit-ready refs.
-
-```tsx
-import { useAttachments } from '@higgsfield/fnf-react'
-
-const attachments = useAttachments(mediaClient, {
-  upload: { forceIpCheck: true },
-})
-
-function onFiles(files: File[]) {
-  attachments.add(files, { role: 'start_image' })
-}
-
-async function submit() {
-  const refs = await attachments.settled()
-  await jobClient.submit({
-    model: 'seedance_2_0',
-    media: { start_image: refs },
-    prompt,
-    settings,
-  })
-}
-```
-
-Lifecycle:
-
-- File items start as `uploading`, then become `ready`, `blocked`, or `failed`.
-- Already-uploaded `MediaRef` values are added as `ready`.
-- `blocked` is moderation-as-state; it is not thrown and does not appear in
-  `attachments.refs`.
-- `failed` items can be retried with `attachments.retry(key)`.
-- `remove(key)` aborts an in-flight upload and revokes local preview URLs.
-- `clear()` aborts all in-flight uploads and removes every item.
-- `settled()` waits for in-flight uploads and returns ready refs.
-- `move(from, to)` is presentational ordering.
-- Intrinsic image/video/audio meta is measured by default from local files and
-  attached to `MediaRef.meta`. Set `measure: false` to disable it. Measurement
-  is best-effort by contract: a failed measurement never fails the upload.
-- Use `useAttachments` only when its media client can upload in the browser
-  safely. If the adapter/token must stay server-side, build a multipart upload
-  route and feed the returned `MediaRef` into the same UI state shape.
-
-The controller does not enforce job media counts, roles, dimensions, or
-duration limits. The SDK job declaration validates those when building/submitting
-the job.
-
-## Profile and workspace
-
-Use profile query options for account/workspace reads.
-
-```tsx
-import { useQuery } from '@tanstack/react-query'
-import {
-  profileCreditsQueryOptions,
-  profileCurrentWorkspaceQueryOptions,
-  profileSnapshotQueryOptions,
-  profileUserQueryOptions,
-  profileWalletQueryOptions,
-  profileWorkspacesQueryOptions,
-  setProfileSnapshot,
-} from '@higgsfield/fnf-react'
-
-const profile = useFnfProfileClient()
-const scope = { scopeKey }
-
-const snapshot = useQuery(profileSnapshotQueryOptions(profile, scope))
-const user = useQuery(profileUserQueryOptions(profile, scope))
-const workspaces = useQuery(profileWorkspacesQueryOptions(profile, scope))
-const current = useQuery(profileCurrentWorkspaceQueryOptions(profile, scope))
-const wallet = useQuery(profileWalletQueryOptions(profile, scope))
-const credits = useQuery(profileCreditsQueryOptions(profile, {
-  ...scope,
-  includeOnDemand: true,
-}))
-
-setProfileSnapshot(queryClient, snapshot.data!, scope)
-```
-
-Workspace switching:
-
-```tsx
-import { useSwitchWorkspaceMutation } from '@higgsfield/fnf-react'
-
-const switchWorkspace = useSwitchWorkspaceMutation({
-  scopeKey,
-  nextScopeKey: snapshot => `${snapshot.user?.id}:${snapshot.currentWorkspace?.id}`,
-  onWorkspaceChanged: async snapshot => {
-    setActiveWorkspaceId(snapshot.currentWorkspace?.id ?? '')
-    await updateHostSession(snapshot)
-  },
-})
-
-await switchWorkspace.mutateAsync({ workspaceId })
-```
-
-On success, the mutation helper:
-
-- calls `profile.switchWorkspace({ workspaceId })`
-- removes generation/cost caches for the old scope
-- removes old scoped profile caches when the scope changes
-- writes the returned snapshot into profile caches for the next scope
-- calls `onWorkspaceChanged(snapshot)`
-
-It does not update Clerk/session metadata, mutate adapter header state, reload
-the page, redirect, or show copy. The host must do those things.
-
-## Request preview and cost
-
-Use local wire previews to show validation/build-wire state without submitting.
-
-```tsx
-import {
-  costQueryOptions,
-  getWirePreview,
-  useFnfWirePreview,
-} from '@higgsfield/fnf-react'
-
-const preview = useFnfWirePreview(input)
-const manual = getWirePreview(input, jobs)
-
-const cost = useQuery(costQueryOptions(jobClient, input, {
-  scopeKey,
-  enabled: preview.ok,
-}))
-
-if (preview.ok) {
-  preview.jobSetType
-  preview.outputType
-  preview.params
-}
-else {
-  preview.error.code
-}
-```
-
-`cost.data?.credits` is already a display-credit value from the core SDK.
-Profile wallet raw balances are credit-cents, but profile credits returned by
-the SDK profile domain are normalized for display.
-
-## Observability
-
-`FnfProvider` accepts the core SDK observability options and passes them into
-created clients. `useGenerationRun` and `useAttachments` also inherit provider
-observability unless hook options override it.
-
-Safe React event names include:
-
-- `fnf.react.generation_run.start`
-- `fnf.react.generation_run.submitted`
-- `fnf.react.generation_run.progress`
-- `fnf.react.generation_run.completed`
-- `fnf.react.generation_run.failed`
-- `fnf.react.generation_run.aborted`
-- `fnf.react.generation_run.reset`
-- `fnf.react.attachments.add`
-- `fnf.react.attachments.upload_start`
-- `fnf.react.attachments.ready`
-- `fnf.react.attachments.blocked`
-- `fnf.react.attachments.failed`
-- `fnf.react.attachments.retry`
-- `fnf.react.attachments.remove`
-- `fnf.react.attachments.clear`
-- `fnf.react.attachments.settled`
-
-Observers are metadata-only; see the observability privacy rule in
-`../../fnf/ai/AGENTS.md`.
-
-## Realtime helpers
-
-`Realtime` and `RefCountPool` are low-level helpers for shared live channels.
-They are transport-agnostic and optional.
-
-- Subscribe by job set when a transport has a real-time channel.
-- Reuse one connection per job set through ref counting; the pool keeps the
-  connection open for `freeGraceMs` (default 1000 ms) after the last
-  unsubscribe so quick re-subscribes reuse it.
-- Let event callbacks invalidate `fnfKeys.jobSet(jobSetId, { scopeKey })`.
-- If a transport returns `undefined` or throws, treat it as "no channel" and
-  rely on polling query options.
-
-## When in doubt
-
-Read `../../fnf/ai/AGENTS.md` for SDK/domain behavior, use `src/index.ts` as
-the public API list, and keep host policy in the host app, not in `fnf-react`.
+`check:ui` scans `src/layouts`, `src/routes`, `src/components/custom-ui`,
+`src/features` and `src/widgets` for raw colour literals and `dark:` variants.
+It does NOT scan `src/components/scroll-scrub` or `src/scroll-scrub-scenes.ts`,
+so the site's own palette lives in those (and in `src/styles.css`) without
+tripping the gate. Keep raw hex out of route files.
